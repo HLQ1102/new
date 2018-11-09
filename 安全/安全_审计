@@ -1,0 +1,39 @@
+审计，基于事先配置的规则生成日志，记录可能发生在系统上的事件
+]# auditctl  -s     //查询状态
+]# auditctl  -l     //查看规则
+]# auditctl  -D     //删除所有规则
+
+#语法格式：auditctl  -w  path  -p  permission  -k  key_name
+# path为需要审计的文件或目录
+# 权限可以是r,w,x,a(文件或目录的属性发生变化)
+# Key_name为可选项，方便识别哪些规则生成特定的日志项
+
+]# auditctl -w /etc/ -p rwx -k mon_etc
+]# auditctl -w /etc/passwd -p rwa -k mon_passwd
+创建永久审计规则
+]# vim  /etc/audit/rules.d/audit.rules
+  -w /etc/passwd -p wa -k passwd_changes
+  -w /usr/sbin/fdisk -p x -k partition_disks
+
+日志分析
+#内容分析
+# type为类型
+# msg为(time_stamp:ID)，时间是date +%s（1970-1-1至今的秒数）
+# arch=c000003e，代表x86_64（16进制）
+# success=yes/no，事件是否成功
+# a0-a3是程序调用时前4个参数，16进制编码了
+# ppid父进程ID，如bash，pid进程ID，如cat命令
+# auid是审核用户的id，su - test, 依然可以追踪su前的账户
+# uid，gid用户与组
+# tty:从哪个终端执行的命令
+# comm="cat"            用户在命令行执行的指令
+# exe="/bin/cat"        实际程序的路径
+# key="sshd_config"    管理员定义的策略关键字key
+# type=CWD        用来记录当前工作目录
+# cwd="/home/username"
+# type=PATH
+# ouid(owner's user id）    对象所有者id
+# guid(owner's groupid）    对象所有者id
+ 
+ausearch日志搜索命令 -k：指定日志文件名 -i：以人性化的格式显示
+]# ausearch -k mon_xiaodir -i | grep mon_xiaodir | tail -1

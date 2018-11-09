@@ -1,0 +1,155 @@
+1 数据加密解密
+
+加密算法主要有以下几种分类：
+1.为确保数据机密性算法：
+ a) 对称加密算法(AES,DES)
+ b) 非对称加密算法（RSA，DSA）
+2.为确保数据完整性算法：
+ a) 信息摘要（MD5，SHA256，SHA512） 保护信息的完整性
+]# echo abc | md5sum
+0bee89b07a248e27c83fc3d5951213c1  -
+]# echo abc | sha1sum
+03cfd743661f07975fa2f1220c5194cbaff48451  -
+
+对称加密
+which gpg   检验命令的存在
+pgp对称加密
+gpg -c 1.txt //设置密码并生成1.txt.gpg加密文件
+
+
+
+非对称加密，创建密钥对
+]# gpg --gen-key   
+  //A会在当前用户的家目录下生成~/.gnupg/ 的文件夹
+]# ls ~/.gnupg/
+gpg.conf           pubring.gpg(公钥)   random_seed  S.gpg-agent
+private-keys-v1.d  pubring.gpg~  secring.gpg(私钥)  trustdb.gpg
+
+]# dd if=/dev/zero of=/a.txt bs=1M count=10240   //往硬盘写入10G的数据文件a.txt，产生随机码
+
+A将公钥传给客户端B
+A导出公钥，
+]# gpg --export -a > secur.gpg  导出公钥到secur.gpg文件中
+B导入公钥
+]# gpg --import secur.gpg 
+
+B使用公钥加密文件
+]# gpg -e -r /etc/passwd   // -e 加密文件，-r 指定使用哪一个公钥加密文件 
+# 可以多重嵌套
+
+
+2 aide入侵检测
+作用：检测文件是否是被更改过内容或添加了新文件
+]# vim /etc/aide.conf
+   7 database=file:@@{DBDIR}/aide.db.gz  //存储检测之前文件的信息，状态一
+  12 database_out=file:@@{DBDIR}/aide.db.new.gz //发生改变后文件的状态信息，状态二
+                                                                检测就时检测状态一到状态二之间的文件改变的内容
+  #98行以下就是写被检测的文件,将98以下的行全部注释掉
+  98 /testdir FIPSR
+  99 [!] /dir/    //设置不校验的目录
+:wq
+
+]# mkdir /testdir ; echo aaa > /testdir/a.txt
+]# aide -i   //初始化
+]# cd /var/lib/aide
+]# ls 
+]# cp aide.db.new.gz /root/   //备份
+]# mv aide.db.new.gz aide.db.gz  //改名与配置文件/etc/aide.conf一致
+]# echo fkalsdfjl > /testdir/b.txt    //增加新文件
+]# echo bbbb >> /testdir/a.txt        //更改文件
+#] aide -C                    //检测变化，会有输出，高知我们发生的变化
+
+
+nmap扫描
+半开式扫描，只完成两次握手
+全开式扫描，完成三次握手才结束扫描
+// -sS，TCP SYN扫描（半开）
+// -sT，TCP 连接扫描（全开）
+// -sU，UDP扫描
+// -sP，ICMP扫描
+// -A，目标系统全面分析
+// -n不做主机名解析
+
+
+
+tcpdump 抓包命令
+应用：用来验证网络中的数据包的行为,抓取服务器的包，用来分析得出我的服务器的访问情况
+1.装包
+yum -y install tcpdump-4.9.0-5.el7.x86_64
+2.基本用法
+  tcpdump  [选项] [过滤条件]
+ -i 指定网络接口
+ -A 转换为ACCII码 方便阅读
+ -w 将数据包信息保存到指定的文件
+ -r 从指定文件文件读取数据包信息
+ -c 指定抓取包的个数
+过滤条件 
+  - 类型：host、net、 port、 portrange
+  - 方向：src、dst
+  - 协议：tcp、udp、ip、wlan、arp...
+  - 多个条件组合：and、or、not
+
+]# tcpdump -A -w /wu/ftp.cap host 192.168.4.51 and port 21
+//抓取主机192.168.4.51端口是21 的包，不论源包或目的包
+
+wireshark软件查看
+
+
+使用route add default gw 192.168.2.52添加网关的时候需要将NetworkManager服务关掉
+rhel6添加服务开启自启：chkconfig iptables on
+
+网络型防火墙
+准备 ： 
+                 
+51主机：eth1 2.51----- eth1:2.52 |52主机|  eth0:4.52 ---------  eth1:4.53主机 
+
+]# iptables -t filter -F
+]# iptables -t nat -F
+]# iptables -t mangle -F
+]# iptables -t raw -F
+]# iptables -t filter -P FORWARD DROP
+
+]# iptables -t filter -A FORWARD -p icmp -j ACCEPT
+]# iptables -t filter -I FORWARD 2 -p tcp --dport 3306  -j ACCEPT
+]# iptables -t filter -I FORWARD 2 -p tcp --sport 3306  -j ACCEPT
+]# iptables -t filter -A FORWARD -p tcp --dport 80 -j ACCEPT
+]# iptables -t filter -A FORWARD -p tcp --sport 80 -j ACCEPT
+
+
+设置SNAT源地址转换
+]# echo 1 > /proc/sys/net/ipv4/ip_forward //开启路由转发
+]# iptables -t nat -A POSTROUTING -s 192.168.4.0/24 -p tcp --dport 80 -j SNAT  --to-source 192.168.2.52
+// -A POSTROUTING    --> 在POSTROUTING链最后添加规则
+   -s 192.168.4.0/24 -->  指定数据包的源IP为192.168.4.0网段的主机
+   -p tcp --dport 80 --> 指定传输协议为tcp，目标端口为80的数据包
+   -j SNAT 采用源地址转换的技术
+   --to-source 192.168.2.52 转换后的IP为192.168.2.52
+
+设置目标地址转换 即DNAT
+
+
+
+ftp: 命令下使用 lcd进入本地目录
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,28 @@
+tomcat安全
+
+隐藏版本信息
+修改tomcat主配置文件，隐藏版本信息
+yum -y install java-1.7.0-openjdk-devel
+rpm -q java-1.7.0-openjdk-devel
+vim  /usr/local/tomcat/lib/org/apache/catalina/util/ServerInfo.properties
+ 16 server.info=Nginx xxxx/9.0.13
+ 17 server.number=9.0.13.0
+ 18 server.built=Dec 1 2015 22:30:46 UTC
+ :wq
+
+降权启动，使用非root启动tomcat服务
+默认tomcat使用系统高级管理员账户root启动服务，启动服务尽量使用普通用户。
+]# netstat -ntulp | grep :8080
+]# ps aux | grep j     //查看进程执行者
+]# useradd tomcat
+]# chown -R tomcat:tomcat /usr/local/tomcat/
+]# /usr/local/tomcat/bin/shutdown.sh
+]# su tomcat /usr/local/tomcat/bin/startup.sh  //使用su命令切换为tomcat账户，以tomcat账户的身份启动tomcat服务
+]# ps aux | grep java
+]# su tomcat /usr/local/tomcat/bin/startup.shava  
+
+]# chmod +x /etc/rc.local                //该文件为开机启动文件
+]# vim /etc/rc.local                     //修改文件，添加如下内容
+su -c /usr/local/tomcat/bin/startup.sh tomcat
+
+

@@ -1,0 +1,57 @@
+打补丁
+
+diff制作补丁文件的原理：告诉我们怎么修改第一个文件后能得到第二个文件。
+这样如果第一个版本的脚本有漏洞，我们不需要将整个脚本都替换，仅需要修改有问题的一小部分代码即可，diff刚好可以满足这个需求！
+像Linux内核这样的大块头，一旦发现有一个小漏洞，我们不可能把整个内核都重新下载，全部替换一遍，而仅需要更新有问题的那一小部分代码即可！
+diff命令常用选项：
+-u	输出统一内容的头部信息（打补丁使用），计算机知道是哪个文件需要修改
+-r	递归对比目录中的所有资源（可以对比目录）
+-a	所有文件视为文本（包括二进制程序）
+-N	无文件视为空文件（空文件怎么变成第二个文件）
+-N选项备注说明：
+A目录下没有txt文件，B目录下有txt文件
+diff比较两个目录时，默认会提示txt仅在B目录有（无法对比差异，修复文件）
+diff比较时使用N选项，则diff会拿B下的txt与A下的空文件对比，补丁信息会明确说明如何从空文件修改后变成txt文件，打补丁即可成功！
+
+]# diff -u game.sh game_1.sh   //差异比较，产生补丁信息  -u 只比较文本文件
+]# diff -u game.sh game_1.sh > game.patch  生成补丁文件
+
+]# yum -y install patch  //安装打补丁的软件
+]# patch -p0 < game.patch    //为代码打补丁
+]# patch -RE < game.patch    ////还原旧版本，反向修复，回滚，
+
+综合：
+]# diff -u game.sh game_1.sh | patch -p0 //省去生成补丁文件，直接将差异信息交给打补丁程序
+
+环境准备
+[root@redis_50 dome]# rm -rf g*
+[root@redis_50 dome]# vim si/game.sh
+[root@redis_50 dome]# vim s1/game.sh
+[root@redis_50 dome]# vim s2/game.sh
+[root@redis_50 dome]# which find
+/usr/bin/find
+[root@redis_50 dome]# cp /usr/bin/find s1/
+[root@redis_50 dome]# cp /usr/bin/find s2/
+[root@redis_50 dome]# echo "1" >> s2/find 
+[root@redis_50 dome]# echo "FFF" >> s2/test.txt
+[root@redis_50 dome]# 
+
+]# yum -y install tree 
+]# tree
+.
+├── s1
+│   ├── find
+│   └── game.sh
+└── s2
+    ├── find
+    ├── game.sh
+    └── test.txt
+
+]# diff -rauN s1 s2  > game.patch     //-r 递归对比目录中的所有资源（可以对比目录）
+                                      //-a 所有文件视为文本（包括二进制程序）
+                                      // -N  无文件视为空文件（空文件怎么变成第二个文件）
+]# cd s1/
+]# patch -p1 < ../
+]# patch -p1 < ../game.patch    
+
+

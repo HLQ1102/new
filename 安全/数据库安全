@@ -1,0 +1,20 @@
+mariadb 安全设置
+
+1.初始化mariadb数据库，安全脚本
+   安装完MariaDB或MySQL后，默认root没有密码，并且提供了一个任何人都可以操作的test测试数据库。有一个名称为 mysql_secure_installation的脚本，该脚本可以帮助我们为root设置密码，并禁止root从远程其他主机登陆数据库，并删除测 试性数据库test。
+
+]# mysql_secure_installation 
+
+2.修改密码
+]# mysqladmin -uroot -p123456 password "qwerty" //-p旧密码 password "新密码"
+MariaDB [(none)]> set password for root@localhost=password("123456");
+
+清空历史命令： history -c
+保存历史命令： hsitory -w   //清空历史命令后保存历史命令即清空了所有的历史命令
+历史命令存放的位置： ls  ~/.bash_history
+数据库的历史命令存放位置：ls ~/.mysql_history
+
+mysql的数据默认是明文传输的通过抓包可以看见所有的命令和数据 ，解决办法：使用SSL认证或SSH加密连接
+
+
+

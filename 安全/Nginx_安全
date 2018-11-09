@@ -1,0 +1,89 @@
+nginx_安全
+
+Nginx是模块化软件
+ - 在./configure配置时需要使用 --with加载模块
+ - 不需要的模块使用 --without禁用模块
+ - 最小化安装永远是对的
+ --without-http_autoindex_module ##./configure 配置的时候指定此项即不加载网站自动索引
+                                           ##网站自动索引：当某个网页目录或子目录下没有index文件
+                                              时，网页就会把整个该目录下的所有文件都列出来，对网站
+                                              非常不安全，
+
+1.隐藏版本信息
+vim /usr/local/nginx/conf/nginx.conf //添加server_tokens off;如下
+http {
+      server_tokens off;
+}
+
+2.修改版本信息
+1）(源码目录下的src/http/ngx_http_header_filter_module.c)
+未修改之前：
+ 49 static u_char ngx_http_server_string[] = "Server: nginx" CRLF;
+ 50 static u_char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
+ 51 static u_char ngx_http_server_build_string[] = "Server: " NGINX_VER_BUILD CRLF;
+
+]# vim +48 ./nginx-1.12.2/src/http/ngx_http_header_filter_module.c
+ 49 static u_char ngx_http_server_string[] = "Server: IIS" CRLF;
+ 50 static u_char ngx_http_server_full_string[] = "Server: IIS"  CRLF;
+ 51 static u_char ngx_http_server_build_string[] = "Server: IIS"  CRLF;
+2) 停止服务，重新编译安装
+3) 启动服务
+4) 使用curl -I IP地址 测试版本信息是否修改成功
+
+3 屏蔽非法访问
+vim ./nginx/conf/nginx.conf
+http{
+     server{
+        if ($request_method !~ ^(GET|POST|DELETE)$) { //如果请求头是post或get
+               return 500;                       就直接返回500，防止不良请求对服务器
+        }                                                      发起攻击下载服务器资源,破坏服务器结构
+       }
+  }
+ 
+  GET  ： 请求指定的页面信息，并返回实体主体
+  HEAD ： 类似于GET请求，只不过返回的响应中没有具体的内容，用于获取报头
+  POST ： 向指定资源提交数据进行处理请求（例如：提交表单或则上传文件）
+  DELETE：请求服务器删除指定的页面
+  PUT  ： 向服务器特定位置上传资料
+
+4. 限制并发量
+DDOS攻击者会发送大量的并发连接，占用服务器资源（包括连接数、带宽等），这样会导致正常用户处于等待或无法访问服务器的状态。
+
+Nginx提供了一个ngx_http_limit_req_module模块，可以有效降低DDOS攻击的风险，操作方法如下：
+]# vim /usr/local/nginx/conf/nginx.conf
+… …
+http{
+… …
+limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
+    server {
+        listen 80;
+        server_name localhost;
+        limit_req zone=one burst=5;   //备注： burst == burff request 
+            }
+}
+
+//备注说明：
+//limit_req_zone语法格式如下：
+//limit_req_zone key zone=name:size rate=rate;
+//上面案例中是将客户端IP信息存储名称为one的共享内存，内存空间为10M
+//1M可以存储8千个IP信息，10M可以存储8万个主机连接的状态，容量可以根据需要任意调整
+//每秒中仅接受1个请求，多余的放入漏斗
+//漏斗超过5个则报错
+
+5. 防止buffer溢出
+当客户端连接服务器时，服务器会启用各种缓存，用来存放连接的状态信息。
+如果攻击者发送大量的连接请求，而服务器不对缓存做限制的话，内存数据就有可能溢出（空间不足）。
+修改Nginx配置文件，调整各种buffer参数，可以有效降低溢出风险。
+]# vim /usr/local/nginx/conf/nginx.conf
+http{
+client_body_buffer_size  1K;
+client_header_buffer_size 1k;
+client_max_body_size 1k;
+large_client_header_buffers 2 1k;
+ … …
+} 
+重启nginx服务 ]# /usr/local/nginx/sbin/nginx  ---> 回车	
+
+
+
+
