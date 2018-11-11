@@ -1,0 +1,169 @@
+监控内容
+    查看内存信息
+    查看交换分区信息
+    查看磁盘信息
+    查看CPU信息
+    查看网卡信息
+    查看端口信息
+    查看网络连接信息
+cacti： 需要支持SNMP协议，强大的绘图能力
+Nagios：基于Agent监控，强大的状态检查与报警机制 ，插件多，自己写监控脚本插入Nagios非常方便
+Zabbix：基于多种监控机制，支持分布式监控
+
+iostat 查看系统I/O速度
+
+Zabbix 基于B/S模式访问查看监控情况，企业级监控服务器 
+ - 数据可以写入MySQL、Oracle等数据库
+ - 服务器使用LNMP实现web前端的管理
+ - 监控服务器可以通过SNMP或Agent采集数据
+
+搭建LNMP平台
+   配置Nginx支持PHP动态网站，开启Nginx的各种fastcgi缓存，加速PHP脚本的执行速度
+]# vim /usr/local/nginx/conf/nginx.conf
+http{
+… …
+    fastcgi_buffers 8 16k;                       //缓存php生成的页面内容，8个16k
+    fastcgi_buffer_size 32k;                     //缓存php生产的头部信息
+    fastcgi_connect_timeout 300;                 //连接PHP的超时时间
+    fastcgi_send_timeout 300;                    //发送请求的超时时间
+    fastcgi_read_timeout 300;                    //读取请求的超时时间
+location ~ \.php$ {
+                root           html;
+                fastcgi_pass   127.0.0.1:9000;
+                fastcgi_index  index.php;
+                include        fastcgi.conf;
+        }
+
+创建库，存储zabbix监控服务的配置信息和监控数据，并授权连接
+]# mysql -uroot -p123456
+   create database zabbixdb;
+   grant all on zabbixdb.* to yaya100@"localhost" identified by "123456";
+
+安装源码zabbix软件
+rpm -ivh libevent-devel-2.0.21-4.el7.x86_64.rpm
+yum -y install curl-devel
+useradd zabbix
+yum -y install net-snmp-devel
+cd zabbix
+./configure --prefix=/usr/local/zabbix --enable-server \
+> --enable-proxy --enable-agent --with-mysql=/usr/bin/mysql_config \
+> --with-net-snmp --with-libcurl
+make install
+
+对zabbix服务做初始化配置，登陆web管理页面,指定数据库用户名，密码，数据库zabbix，及数据库的ip地址
+cd /root/lnmp_soft/zabbix/
+cd database/
+cd  mysql/
+mysql -uyaya100 -p123456 zabbixdb < schema.sql
+mysql -uyaya100 -p123456 zabbixdb < images.sql
+mysql -uyaya100 -p123456 zabbixdb < data.sql
+cd /root/lnmp_soft/zabbix/
+cp -r frontends/php/ /usr/local/nginx/html/zabbix/
+chmod 777 /usr/local/nginx/html/zabbix/conf
+
+]# vim /etc/php.ini
+date.timezone = Asia/Shanghai              //设置时区
+max_execution_time = 300                   //最大执行时间，秒
+post_max_size = 32M                        //POST数据最大容量
+max_input_time = 300                       //服务器接收数据的时间限制
+memory_limit = 128M                        //内存容量限制
+
+启动zabbix服务
+修改主配置文件，指定zabbix使用的数据库授权的数据库用户，密码，数据库，修改启动脚本，指定zabbix安装路径
+ - 服务配置文件  vim /usr/local/zabbix/etc/zabbix_server
+      38 LogFile=/tmp/zabbix_server.log
+      85 # DBHost=localhost      //不指定默认本机
+      95 DBName=zabbixdb    //授权的数据库
+      111 DBUser=yaya100    //授权用户
+      119 DBPassword=123456 //授权用户密码
+ - 使用单核的启动脚本
+  cp /root/lnmp_soft/zabbix-3.4.4/misc/init.d/fedora/core/* /etc/init.d/
+  chmod +x /etc/init.d/zabbix_*
+  vim /etc/init.d/zabbix_server
+ 22         BASEDIR=/usr/local/zabbix
+]# /etc/init.d/zabbix_server start   //启动服务
+]# ss -ntlup | grep :10051 //验证端口已经启动
+
+zabbix软件的基本使用
+
+查看监控服务器已经监控了哪些主机
+查看监控服务器支持的监控模板
+查看监控信息
+
+基本配置
+1 监控本机
+   在本机运行zabbix_agent服务
+  vim /usr/local/zabbix/etc/zabbix_agentd.conf
+    30 LogFile=/tmp/zabbix_agentd.log
+    93 Server=127.0.0.1  //服务运行后允许监控自己的监控服务器,允许访问agent服务的IP地址
+   134 ServerActive=127.0.0.1:10051  //指定监控服务器的IP和port号
+   280 UnsafeUserParameters=1   //1：表示可以自定监控命令
+ 265 Include=/usr/local/zabbix/etc/zabbix_agentd.conf.d/*.conf  启动agent服务时加载这些文件
+
+启动脚本，使用启动脚本启动程序，启动脚本在源码目录的下面，如下目录
+  cd /root/lnmp_soft/zabbix-3.4.4/
+  cd misc/init.d/fedora/core
+  cp * /etc/init.d/
+  chmod +x /etc/init.d/zabbix_agentd
+  vim /etc/init.d/zabbix_agentd
+    22         BASEDIR=/usr/local/zabbix  //修改zabbix的安装目录
+  使用脚本启动服务
+   /etc/init.d/zabbix_agentd start
+   ss -ntulp | grep :10050
+  web页面添加监控主机
+
+2 监控远端主机22
+ - 配置远端主机：运行zabbix_agentd服务
+  yum -y install pcre-devel
+  ./configure --prefix=/usr/local/zabbix --enable-agent   
+  ls /usr/local/zabbix/
+    bin  etc  lib  sbin  share
+ 
+ ]# vim /usr/local/zabbix/etc/zabbix_agentd.conf
+   30 LogFile=/tmp/zabbix_agentd.log  //日志文件
+   93 Server=127.0.0.1,192.168.4.5  //允许这两个地址可以访问本机的zabbix_agentd服务
+  134 ServerActive=192.168.4.5:10051  //监控服务器的ip地址和服务器
+  280 UnsafeUserParameters=1   //1:允许自己定义监控命令
+  265 Include=/usr/local/zabbix/etc/zabbix_agentd.conf.d/*.conf  //启动zabbix_agent服务时加载这些文件
+创建启动脚本，启动程序
+    cp misc/init.d/fedora/core/zabbix_agentd  /etc/init.d/
+    chmod +x /etc/init.d/zabbix_agentd 
+    sed -i '22s;/usr/local;/usr/local/zabbix;' /etc/init.d/zabbix_agentd
+    sed -n '22p'  /etc/init.d/zabbix_agentd
+    /etc/init.d/zabbix_agentd start
+    ss -ntlup | grep :10050
+
+
+
+ - 配置监控服务器： 添加监控新主机，并查看监控信息
+  关闭22上的selinux和防火墙
+  添加新监控的主机，指定主机名，群组，ip，模板:选择template OS Linux
+
+3 自定义监控项
+ - 配置被监控端 192.168.4.22
+  允许自定义监控项
+   vim /usr/local/zabbix/etc/zabbix_agentd.conf
+     280 UnsafeUserParameters=1  // 1:允许自己定义监控命令
+       265 Include=/usr/local/zabbix/etc/zabbix_agentd.conf.d/*.conf  //启动zabbix_agent服务时加载这些文件
+    定义监控命令的模板vim /usr/local/zabbix/etc/zabbix_agentd.conf 
+     284  #  Format: UserParameter=<key>,<shell command>
+  - 定义监控命令（被监控服务器）
+      vim /usr/local/zabbix/etc/zabbix_agentd.conf.d/getusers.conf
+           UserParameter=get_users,wc -l /etc/passwd | awk '{print $1}'
+                   注：wc -l /etc/passwd | awk '{print $1}' 该命令统计user的个数，并输出具体数字
+  - 重启服务，载入配置（被监控服务器）
+      /etc/init.d/zabbix_agentd stop
+      /etc/init.d/zabbix_agentd start
+  - 测试定义的监控命令（被监控服务器）
+      /usr/local/zabbix/bin/zabbix_get -s 127.0.0.1 -p 10050 -k get_users 
+             结果----> 46
+ - 配置监控服务器（图形配置）
+   创建监控模板  Atmp
+   创建应用集    usersgroup
+   创建监控项    monitor_54_users 对应命令get_users(22上创建的监控命令)
+   监控主机22时调用新建的模板
+
+4 监控报警
+
+
+
