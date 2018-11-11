@@ -45,11 +45,9 @@ yum -y install curl-devel
 useradd zabbix
 yum -y install net-snmp-devel
 cd zabbix
-./configure --prefix=/usr/local/zabbix --enable-server \
-> --enable-proxy --enable-agent --with-mysql=/usr/bin/mysql_config \
-> --with-net-snmp --with-libcurl
-make install
-
+./configure --prefix=/usr/local/zabbix --enable-server --enable-proxy --enable-agent --with-mysql=/usr/bin/mysql_config --with-net-snmp --with-libcurl  //配置zabbix软件
+make install  //安装
+         注L：--enable-agent 安装为本机提供客户端监控程序，为监控服务器提供一个监控切入点，监控服务器由这个监控程序来监控这台主机，这里监控服务器作为监控本机使用
 对zabbix服务做初始化配置，登陆web管理页面,指定数据库用户名，密码，数据库zabbix，及数据库的ip地址
 cd /root/lnmp_soft/zabbix/
 cd database/
@@ -84,7 +82,7 @@ memory_limit = 128M                        //内存容量限制
 ]# /etc/init.d/zabbix_server start   //启动服务
 ]# ss -ntlup | grep :10051 //验证端口已经启动
 
-zabbix软件的基本使用
+zabbix软件的基本使用 (图形设置)
 
 查看监控服务器已经监控了哪些主机
 查看监控服务器支持的监控模板
@@ -132,7 +130,6 @@ zabbix软件的基本使用
     sed -n '22p'  /etc/init.d/zabbix_agentd
     /etc/init.d/zabbix_agentd start
     ss -ntlup | grep :10050
-
 
 
  - 配置监控服务器： 添加监控新主机，并查看监控信息
