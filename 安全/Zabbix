@@ -161,6 +161,106 @@ zabbix软件的基本使用 (图形设置)
    监控主机22时调用新建的模板
 
 4 监控报警
+监控主机54系统总用户数量打与46个时报警
+报警方式：发邮件  (mail -s 'xx' zabbix < /etc/hosts  //将hosts的内容发送给zabbix用户)
+           收邮件 ( mail -u zabbix)
 
+5.自动监控
+ 自动发现新主机
+  - 创建自动发现规则
+          设置以http服务为发现条件能够更快的发现需要监控的主机
+  - 创建动作，并指定动作的具体操作
+          以自动发现为事件源
+          指定添加的主机群组，和所使用的模板
+  - 在被监控的主机上运行zabbix_agentd服务（10050端口） 
 
+6 主动监控
+ - 默认zabbix采用的是被动监控，主动和被动都是对被监控端主机而言的！
+被动监控：Server向Agent发起连接，发送监控key，Agent接受请求，响应监控数据。
+ - 主动监控：Agent向Server发起连接，Agent请求需要检测的监控项目列表，Server响应Agent发送一个items列表，Agent确认收到监控列表，TCP连接完成，会话关闭，Agent开始周期性地收集数据。
+ - 区别：Server不用每次需要数据都连接Agent，Agent会自己收集数据并处理数据，Server仅需要保存数据即可。
+ - 当监控主机达到一定量级后，Zabbix服务器会越来越慢，此时，可以考虑使用主动监控，释放服务器的压力。
+ - 另外，Zabbix也支持分布式监控，也是可以考虑的方案。
+
+  主机57 运行agent程序
+   - 装包
+   - 修改配置文件 
+   vim /usr/local/zabbix/etc/zabbix_agentd.conf
+   # Server=127.0.0.1
+   StartAgents=0    //被动监控时启动多个进程.设置为0，则禁止被动监控，不启动zabbix_agentd服务,只启动进程
+   ServerActive=192.168.4.5      //允许哪些主机监控本机（主动模式），一定要取消127.0.0.1     
+   RefreshActiveChecks=120     //默认120秒检测一次
+   Hostname=host57 //告诉监控服务器，是谁发的数据信息,一定要和zabbix服务器配置的监控主机名称一致,后面设置
+   :wq
+
+   创建启动agent程序 
+    /usr/local/zabbix/sbin/zabbix_agentd  --->回车直接启动
+    ps -C zabbix_agentd    //查看程序成功启动
+   配额哦只监控服务器4.5
+   - 修改监控项的监控方式为注监控方式
+      克隆已有的监控系统的模板
+   - 添加监控主机57 并调用主动的监控方式
+      添加监控
+ 
+
+监控nginx服务状态
+nginx源码安装的依赖工具
+  yum -y install gcc pcre-devel openssl-devel zlib-devel       //nginx源码安装的依赖工具
+  ./configure --prefix=/usr/local/nginx --user=nginx --group=nginx --with-http_stub_status_module      //状态模块
+  make && make install 
+vim /usr/local/nginx/conf/nginx.conf
+    server {
+      listen 80
+      server_name  localhost;
+      location /status {
+            stub_status on;
+        }
+  }
+
+curl -s http://192.168.4.53/status   //-s安静的输出数据，尽可能减少不必要的输出
+ Active connections: 1 
+ server accepts handled requests
+  28 28 250      //累计连接数个数 处理的连接数的个数 请求的数量
+ Reading: 0 Writing: 1 Waiting: 0 
+  
+  安装zabbix-agent服务，启用自定义监控项功能
+   ./configure --prefix=/usr/local/zabbix --enable-agent
+   make && make install
+   cp /usr/local/zabbix/misc/init.d/fedora/core/zabbix_agentd /etc/init.d/
+   sed -i '22;/usr/local;/usr/local/zabbix;' /etc/init.d/zabbix_agentd
+    
+
+vim /usr/local/zabbix/etc/zabbix_agentd.conf
+ Include=/usr/local/zabbix/etc/zabbix_agentd.conf.d/*.conf
+ UnsafeUserParameters=1
+ ServerActive=192.168.4.5:10051
+ Server=127.0.0.1,192.168.4.5
+
+自定义的监控脚本
+vim /tmp/nginx.sh
+#!/bin/bash
+case $1 in
+active)
+   curl -s http://127.0.0.1/status | awk '/Active/{print $NF}'
+;;
+
+waiting)
+   curl -s http://127.0.0.1/status | awk '/Waiting/{print $NF}'
+;;
+
+accepts)
+   curl -s http://127.0.0.1/status | awk 'NR==3{print $2}'
+;;
+esac
+
+自定义监控key
+如：
+UserParameter=ping[*],echo $1
+ping[0]， 返回的结果都是0   //中括号中的内容即为后面命令中的第一个参数
+ping[aaa]， 返回的结果都是aaa
+
+vim /usr/local/zabbix/etc/zabbix_agentd.conf.d/checknginx.conf
+UserParameter=nginx_status[*],/tmp/nginx.sh $1
+
+//zabbix图形设置时，就填写UserParameter的值nginx_status[*](括号中填写相应参数，即位监控不同的项),新创建模版，然后再创建应用集（写具体监控内容的文件夹），再在应用集里添加监控项，填写监控名，和被监控主机上自定义的键值（key）添加成功即可
 
