@@ -262,5 +262,11 @@ ping[aaa]， 返回的结果都是aaa
 vim /usr/local/zabbix/etc/zabbix_agentd.conf.d/checknginx.conf
 UserParameter=nginx_status[*],/tmp/nginx.sh $1
 
+本机测试zabbix监控集是否配置正确,显示结果即为正确
+]# /usr/local/zabbix/bin/zabbix_get -s 127.0.0.1 -p 10050 -k nginx_status[accepts]
+]# /usr/local/zabbix/bin/zabbix_get -s 127.0.0.1 -p 10050 -k nginx_status[active]
+]# /usr/local/zabbix/bin/zabbix_get -s 127.0.0.1 -p 10050 -k nginx_status[waiting]
+// -s指定主机 -p指定agent监控程序的端口，-k 指定主机上的监控key[参数]
+
 //zabbix图形设置时，就填写UserParameter的值nginx_status[*](括号中填写相应参数，即位监控不同的项),新创建模版，然后再创建应用集（写具体监控内容的文件夹），再在应用集里添加监控项，填写监控名，和被监控主机上自定义的键值（key）添加成功即可
 
